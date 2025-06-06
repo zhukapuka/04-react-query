@@ -7,7 +7,7 @@ interface FetchMoviesParams {
   query: string;
   page: number;
 }
-interface FetchMoviesResult {
+export interface FetchMoviesResult {
   page: number;
   results: Movie[];
   total_pages: number;
