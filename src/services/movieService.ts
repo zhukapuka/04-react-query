@@ -1,12 +1,17 @@
 import axios, { AxiosError } from "axios";
-import type { FetchMoviesResult } from "../types/movie";
+import type { Movie } from "../types/movie";
 
+const API_KEY = import.meta.env.VITE_TMDB_TOKEN;
 // Типізую її параметри
 interface FetchMoviesParams {
   query: string;
   page: number;
 }
-
+interface FetchMoviesResult {
+  page: number;
+  results: Movie[];
+  total_pages: number;
+}
 export async function fetchMovies({
   query,
   page,
@@ -20,7 +25,7 @@ export async function fetchMovies({
           page,
         },
         headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_TMDB_TOKEN}`,
+          Authorization: `Bearer ${API_KEY}`,
         },
       }
     );

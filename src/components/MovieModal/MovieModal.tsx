@@ -1,48 +1,85 @@
-import React, { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import type { Movie } from "../../types/movie";
 import css from "./MovieModal.module.css";
+import { createPortal } from "react-dom";
 
 interface MovieModalProps {
-  movie: Movie;
+  movie: Movie | null;
   onClose: () => void;
 }
+const placeholderImage: string =
+  "https://t3.ftcdn.net/jpg/05/46/91/54/240_F_546915409_RV8FDl37kI882cVJ3VBQaFo97fgANtli.jpg";
 
-const MovieModal: React.FC<MovieModalProps> = ({ movie, onClose }) => {
-  // зупинка скролла, щоб не гортало
+export default function MovieModal({ movie, onClose }: MovieModalProps) {
+  const handleBackDropClick = useCallback(
+    (evt: React.MouseEvent<HTMLDivElement>) => {
+      if (evt.target === evt.currentTarget) {
+        onClose();
+      }
+    },
+    [onClose]
+  );
   useEffect(() => {
+    function handleEscKey(evt: KeyboardEvent) {
+      if (evt.key === "Escape") {
+        onClose();
+      }
+    }
+    document.addEventListener("keydown", handleEscKey);
     document.body.style.overflow = "hidden";
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEsc);
+
     return () => {
+      document.removeEventListener("keydown", handleEscKey);
       document.body.style.overflow = "";
-      window.removeEventListener("keydown", handleEsc);
     };
   }, [onClose]);
 
-  // закриваємо при кліку
-  const handleBackdrop = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
-  return (
+  if (movie == null) {
+    return createPortal(
+      <div
+        onClick={handleBackDropClick}
+        className={css.backdrop}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className={css.modal}>
+          <button
+            onClick={onClose}
+            className={css.closeButton}
+            aria-label="Close modal"
+          >
+            &times;
+          </button>
+          <div className={css.content}>
+            <h2>Oops!, something gonna wrong.</h2>
+            <p>No movie data available.</p>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+  return createPortal(
     <div
+      onClick={handleBackDropClick}
       className={css.backdrop}
       role="dialog"
       aria-modal="true"
-      onClick={handleBackdrop}
     >
       <div className={css.modal}>
         <button
+          onClick={onClose}
           className={css.closeButton}
           aria-label="Close modal"
-          onClick={onClose}
         >
           &times;
         </button>
         <img
-          src={`https://image.tmdb.org/t/p/original/${movie.backdrop_path}`}
+          src={
+            movie.backdrop_path !== null
+              ? `https://image.tmdb.org/t/p/original${movie?.backdrop_path}`
+              : placeholderImage
+          }
           alt={movie.title}
           className={css.image}
         />
@@ -53,12 +90,11 @@ const MovieModal: React.FC<MovieModalProps> = ({ movie, onClose }) => {
             <strong>Release Date:</strong> {movie.release_date}
           </p>
           <p>
-            <strong>Rating:</strong> {movie.vote_average}/10
+            <strong>Rating:</strong> {movie.vote_average.toFixed(2)}/10
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
-};
-
-export default MovieModal;
+}
