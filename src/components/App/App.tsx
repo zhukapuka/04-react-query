@@ -8,83 +8,102 @@ import { fetchMovies } from "../../services/movieService";
 import type { Movie } from "../../types/movie";
 import toast, { Toaster } from "react-hot-toast";
 import styles from "./App.module.css";
+import ReactPaginate from "react-paginate";
+import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 
 const App: React.FC = () => {
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
 
-  // закриваю по ESC
+  const handleBackdropClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.target === e.currentTarget) {
+        setSelectedMovie(null);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     if (!selectedMovie) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        handleCloseModal();
+        setSelectedMovie(null);
       }
     };
+
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKeyDown);
+
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = "";
     };
-
-    //  ESLint шоб не сварився и не видавав помилку
   }, [selectedMovie]);
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query) {
+  const handleSearch = useCallback((newQuery: string) => {
+    if (!newQuery) {
       toast.error("Please enter your search query.");
       return;
     }
-    setMovies([]);
-    setError(false);
-    setLoading(true);
-    try {
-      const data = await fetchMovies({ query });
-      if (data.results.length === 0) {
-        toast("No movies found for your request.", { icon: "❌" });
-      }
-      setMovies(data.results);
-    } catch {
-      setError(true);
-      toast.error("There was an error, please try again...");
-    } finally {
-      setLoading(false);
-    }
+    setQuery(newQuery);
+    setPage(1);
   }, []);
 
-  const handleSelectMovie = (movie: Movie) => {
-    setSelectedMovie(movie);
-  };
+  const { data, isPending, isError } = useQuery<
+    FetchMoviesResult,
+    Error,
+    FetchMoviesResult
+  >({
+    queryKey: ["movies", query, page],
+    queryFn: () => fetchMovies({ query, page }),
+    enabled: !!query,
+    placeholderData: keepPreviousData,
+  });
 
-  const handleCloseModal = () => {
-    setSelectedMovie(null);
-  };
-
-  // закриваю модалку по кліку
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      handleCloseModal();
+  useEffect(() => {
+    if (data?.results && data.results.length === 0 && query) {
+      toast.error("No movies found for your search query.");
     }
-  };
+  }, [data, query]);
+
+  const handleSelectMovie = useCallback((movie: Movie) => {
+    setSelectedMovie(movie);
+  }, []);
 
   return (
     <div className={styles.app}>
       <Toaster position="top-center" />
       <SearchBar onSubmit={handleSearch} />
-      {loading && <Loader />}
-      {error && <ErrorMessage />}
-      {!loading && !error && (
-        <MovieGrid movies={movies} onSelect={handleSelectMovie} />
+      {isPending && query && <Loader />}
+      {isError && <ErrorMessage />}
+      {!isPending && !isError && data?.results && data.results.length > 0 && (
+        <>
+          {data.total_pages > 1 && (
+            <ReactPaginate
+              pageCount={data.total_pages}
+              pageRangeDisplayed={5}
+              marginPagesDisplayed={1}
+              onPageChange={({ selected }) => setPage(selected + 1)}
+              forcePage={page - 1}
+              containerClassName={styles.pagination}
+              activeClassName={styles.active}
+              nextLabel="→"
+              previousLabel="←"
+            />
+          )}
+          <MovieGrid movies={data.results} onSelect={handleSelectMovie} />
+        </>
       )}
       {selectedMovie && (
-        <div
-          onClick={handleBackdropClick}
-          style={{ position: "fixed", inset: 0, zIndex: 9999 }}
-        >
-          <MovieModal movie={selectedMovie} onClose={handleCloseModal} />
+        <div className={styles.modalBackdrop} onClick={handleBackdropClick}>
+          <MovieModal
+            movie={selectedMovie}
+            onClose={() => setSelectedMovie(null)}
+          />
         </div>
       )}
     </div>
